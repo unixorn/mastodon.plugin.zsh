@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# Open a mastodon user's profile on your fediverse server so you can follow them
+#
+# Copyright 2023, Joe Block <jpb@unixorn.net>
+
+PREFS_F="$HOME/.mastodon-tools/preferences.sh"
+
+set -o pipefail
+if [[ -n "$DEBUG" ]]; then
+  set -x
+fi
+
+function debug() {
+  if [[ -n "$DEBUG" ]]; then
+    echo "$@"
+  fi
+}
+
+function echo-stderr() {
+  echo "$@" 1>&2  ## Send message to stderr.
+}
+
+function fail() {
+  printf '%s\n' "$1" >&2  ## Send message to stderr. Exclude >&2 if you don't want it that way.
+  exit "${2-1}"  ## Return a code specified by $2 or 1 by default.
+}
+
+function has() {
+  # Check if a command is in $PATH
+  which "$@" > /dev/null 2>&1
+}
+
+function checkdeps() {
+  # shellcheck disable=SC2041
+  for dep in 'open' 'curl'
+  do
+    if ! has "$dep"; then
+      fail "$dep not in PATH"
+    fi
+  done
+}
+
+function load_prefs() {
+  if [[ -r "$PREFS_F" ]]; then
+    # shellcheck disable=SC1090
+    source "$PREFS_F"
+  fi
+}
+
+function usage() {
+  myname=$(basename "$0")
+  echo "$myname usage:"
+  echo
+  echo "$myname @username@example.com"
+}
+
+if [[ $# == 0 ]]; then
+  usage
+  exit 1
+fi
+
+checkdeps
+load_prefs
+
+if [[ -z "$FEDIVERSE_HOME" ]]; then
+  fail "Either add a file at $PREFS_F with FEDIVERSE_HOME=example.com or set the FEDIVERSE_HOME environment variable"
+fi
+
+for user in "$@"
+do
+  open "$FEDIVERSE_HOME/$user"
+done
