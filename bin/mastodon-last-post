@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# Summarize a mastodon account
+#
+# Copyright 2023, Joe Block <jpb@unixorn.net>
+
+set -o pipefail
+if [[ -n "$DEBUG" ]]; then
+  set -x
+fi
+
+function debug() {
+  if [[ -n "$DEBUG" ]]; then
+    echo "$@"
+  fi
+}
+
+function echo-stderr() {
+  echo "$@" 1>&2  ## Send message to stderr.
+}
+
+function fail() {
+  printf '%s\n' "$1" >&2  ## Send message to stderr. Exclude >&2 if you don't want it that way.
+  exit "${2-1}"  ## Return a code specified by $2 or 1 by default.
+}
+
+function has() {
+  # Check if a command is in $PATH
+  which "$@" > /dev/null 2>&1
+}
+
+function checkdeps() {
+  for dep in 'curl' 'jq'
+  do
+    if ! has "$dep"; then
+      fail "$dep not in PATH"
+    fi
+  done
+}
+
+function raw_user_info() {
+  local data
+  local SERVER
+  local FEDI_USER
+  SERVER=$(echo "$1" | awk -F'@' '{print $3}')
+  FEDI_USER=$(echo "$1" | awk -F'@' '{print $2}')
+
+  FED_URL="https://${SERVER}/api/v1/accounts/lookup?acct=$FEDI_USER"
+  # shellcheck disable=SC2086
+  data="$(curl -s $FED_URL | jq .)"
+  echo "$data"
+}
+
+function usage() {
+  myname=$(basename "$0")
+  echo "$myname usage:"
+  echo
+  echo "$myname @username@example.com"
+}
+
+if [[ $# != 1 ]]; then
+  usage
+  exit 1
+fi
+checkdeps
+
+jsondata=$(raw_user_info "$@")
+display_name=$(echo "$jsondata" | jq .display_name | sed 's/"//g')
+last_post=$(echo "$jsondata" | jq .last_status_at | sed 's/"//g')
+
+echo "$display_name"
+echo "Last post: $last_post"
